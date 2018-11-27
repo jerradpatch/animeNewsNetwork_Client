@@ -30,6 +30,7 @@ describe('Testing the ANN API client', function () {
 
           done();
         }, err => {
+          debugger;
           throw err;
         });
     }.bind(null));

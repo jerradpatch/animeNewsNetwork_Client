@@ -2,13 +2,14 @@ import * as convert from 'xml-js';
 import Bottleneck from "bottleneck"
 import * as reqProm from 'request-promise';
 import {fromPromise} from "rxjs/internal-compatibility";
-import {map, retry, retryWhen, tap} from "rxjs/operators";
+import {retry} from "rxjs/operators";
 import {defer} from "rxjs";
+import * as random_useragent from 'random-useragent';
 
 export class ANN_Client {
 
   private reportsUrl = 'https://www.animenewsnetwork.com/encyclopedia/reports.xml?';
-  private detailsUrl = 'https://cdn.animenewsnetwork.com/encyclopedia//nodelay.api.xml?';
+  private detailsUrl = 'https://cdn.animenewsnetwork.com/encyclopedia/nodelay.api.xml?';
 
   private limiter;
 
@@ -30,8 +31,15 @@ export class ANN_Client {
       .then(parse.bind(this));
 
     function request(uri) {
+      //api generates infinite redirect loops when the user agent is not defined ??
+      let userAStr = random_useragent.getRandom();
       return this.limiter.schedule(() => reqProm({
-        uri
+        uri,
+        maxRedirects: '10',
+        followRedirect: true,
+        headers: {
+          'user-agent': userAStr
+        }
       }))
     }
 

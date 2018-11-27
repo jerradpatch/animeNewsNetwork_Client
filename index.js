@@ -6,11 +6,12 @@ var reqProm = require("request-promise");
 var internal_compatibility_1 = require("rxjs/internal-compatibility");
 var operators_1 = require("rxjs/operators");
 var rxjs_1 = require("rxjs");
+var random_useragent = require("random-useragent");
 var ANN_Client = /** @class */ (function () {
     function ANN_Client(ops) {
         this.ops = ops;
         this.reportsUrl = 'https://www.animenewsnetwork.com/encyclopedia/reports.xml?';
-        this.detailsUrl = 'https://cdn.animenewsnetwork.com/encyclopedia//nodelay.api.xml?';
+        this.detailsUrl = 'https://cdn.animenewsnetwork.com/encyclopedia/nodelay.api.xml?';
         Object.assign(this.ops, { apiBackOff: 10, useDerivedValues: true }, ops);
         this.limiter = new bottleneck_1.default({
             maxConcurrent: 1,
@@ -23,8 +24,15 @@ var ANN_Client = /** @class */ (function () {
             .toPromise()
             .then(parse.bind(this));
         function request(uri) {
+            //api generates infinite redirect loops when the user agent is not defined ??
+            var userAStr = random_useragent.getRandom();
             return this.limiter.schedule(function () { return reqProm({
-                uri: uri
+                uri: uri,
+                maxRedirects: '10',
+                followRedirect: true,
+                headers: {
+                    'user-agent': userAStr
+                }
             }); });
         }
         function parse(xmlPage) {
