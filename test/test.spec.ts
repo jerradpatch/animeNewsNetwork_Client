@@ -1,5 +1,7 @@
 import {ANN_Client} from '../index';
 import * as chai from 'chai';
+import * as rp from 'request-promise';
+import * as random_useragent from 'random-useragent';
 
 chai.use(require('chai-datetime'));
 const expect = chai.expect;
@@ -88,6 +90,38 @@ describe('Testing the ANN API client', function () {
         expect(titlesFound).to.have.lengthOf(titles.length);
         done();
       });
+    })
+  });
+
+
+  /*
+  b/c sometimes we have a custom requester that we are using for many different api calls that maybe configured
+  with its own backoff, caching, and response
+   */
+  describe('Test passing a custom requester', function () {
+    it('should work', function (done) {
+      const cOps = {apiBackOff: 10, requestFn: function(uri){
+        let userAStr = random_useragent.getRandom();
+        return rp.get({
+          maxRedirects: '10',
+          followRedirect: true,
+          headers: {
+            'user-agent': userAStr
+          },
+          uri
+        })
+      }};
+      const cAnn = new ANN_Client(cOps);
+
+      cAnn.findTitlesLike(['cardcaptor sakura: clear card'])
+        .then(resp => {
+          const res = resp.anime[0];
+
+          //test anime
+          expect(res.d_episodes).to.have.lengthOf(22);
+
+          done();
+        });
     })
   });
 });

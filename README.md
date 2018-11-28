@@ -7,6 +7,11 @@ A javascript parser for Anime News Network, is meant to run in a NodeJS environm
 2) RxJs
 3) Bottelneck
 
+# Install
+```bash
+npm install --save https://github.com/jerradpatch/animeNewsNetwork_Client/tarball/master
+```
+
 # Example
 ```typescript
 let ops = {apiBackOff: 10};
@@ -23,7 +28,15 @@ export class ANN_Client {
     //default {apiBackOff: 10, useDerivedValues: true}
     //back off uses 
     //https://www.npmjs.com/package/bottleneck
-    constructor(private ops: {apiBackOff?: number, useDerivedValues?: boolean});
+    constructor(private ops: {
+    //the time between requests in seconds
+          apiBackOff?: number,
+    //should d_ values (calculated) be returned in response?
+          useDerivedValues?: boolean,
+    //using your own request function, bypasses the request throttleing (apiBackOff)
+    //**not user-agent must be in the header else the ann api with throw an infinite redirect loop
+          requestFn?: (url: string)=>Promise<string>
+        });
     
     /*
     return types are derived from 

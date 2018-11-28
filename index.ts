@@ -13,9 +13,16 @@ export class ANN_Client {
 
   private limiter;
 
-  constructor(private ops: { apiBackOff?: number, useDerivedValues?: boolean }) {
+  constructor(private ops: {
+    apiBackOff?: number,
+    useDerivedValues?: boolean,
+    requestFn?: (url: string)=>Promise<string>
+  }) {
 
-    Object.assign(this.ops, {apiBackOff: 10, useDerivedValues: true}, ops);
+    Object.assign(
+      this.ops,
+      {apiBackOff: 10, useDerivedValues: true},
+      ops);
     this.limiter = new Bottleneck({
       maxConcurrent: 1,
       minTime: ops.apiBackOff * 1000
@@ -25,7 +32,9 @@ export class ANN_Client {
 
   private requestApi(url): Promise<any> {
 
-    return defer(() => fromPromise(request.call(this, encodeURI(url)))).pipe(
+    return defer(() => fromPromise(
+      (this.ops.requestFn && this.ops.requestFn(url)) || request.call(this, url)
+    )).pipe(
       retry(5))
       .toPromise()
       .then(parse.bind(this));
@@ -34,12 +43,12 @@ export class ANN_Client {
       //api generates infinite redirect loops when the user agent is not defined ??
       let userAStr = random_useragent.getRandom();
       return this.limiter.schedule(() => reqProm({
-        uri,
         maxRedirects: '10',
         followRedirect: true,
         headers: {
           'user-agent': userAStr
-        }
+        },
+        uri: encodeURI(uri)
       }))
     }
 

@@ -6,6 +6,7 @@ export declare class ANN_Client {
     constructor(ops: {
         apiBackOff?: number;
         useDerivedValues?: boolean;
+        requestFn?: (url: string) => Promise<string>;
     });
     private requestApi;
     findTitleWithId(id: string): Promise<any>;

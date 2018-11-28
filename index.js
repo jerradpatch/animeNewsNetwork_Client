@@ -20,19 +20,19 @@ var ANN_Client = /** @class */ (function () {
     }
     ANN_Client.prototype.requestApi = function (url) {
         var _this = this;
-        return rxjs_1.defer(function () { return internal_compatibility_1.fromPromise(request.call(_this, encodeURI(url))); }).pipe(operators_1.retry(5))
+        return rxjs_1.defer(function () { return internal_compatibility_1.fromPromise((_this.ops.requestFn && _this.ops.requestFn(url)) || request.call(_this, url)); }).pipe(operators_1.retry(5))
             .toPromise()
             .then(parse.bind(this));
         function request(uri) {
             //api generates infinite redirect loops when the user agent is not defined ??
             var userAStr = random_useragent.getRandom();
             return this.limiter.schedule(function () { return reqProm({
-                uri: uri,
                 maxRedirects: '10',
                 followRedirect: true,
                 headers: {
                     'user-agent': userAStr
-                }
+                },
+                uri: encodeURI(uri)
             }); });
         }
         function parse(xmlPage) {
