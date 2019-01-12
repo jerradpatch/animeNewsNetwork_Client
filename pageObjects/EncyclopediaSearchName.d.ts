@@ -11,6 +11,7 @@ export declare class EncyclopediaSearchName {
 }
 export declare class EncyclopediaAnime {
     d_mainTitle: any;
+    d_type: any;
     d_genre: any[];
     d_altTitles: any[];
     d_plotSummary: any;

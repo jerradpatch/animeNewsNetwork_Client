@@ -117,7 +117,7 @@ describe('Testing the ANN Parse SearchPage client', function () {
       const titles = ['ulysses jehanne darc to renkin no kishi'];
       ann.findTitlesLike(titles).then((parse: {anime: any[], manga: any[]})=>{
         expect(parse.anime.length).to.be.equal(1);
-        expect(parse.manga.length).to.be.equal(0);
+        expect(parse.manga).to.not.exist;
         done();
       })
     })
@@ -130,7 +130,7 @@ describe('Testing the ANN Parse SearchPage client', function () {
         ann2.findTitlesLike(titles),
         ann.findTitlesLike(titles)]).then(([nonParse, parse]: {anime: any[], manga: any[]}[])=>{
           expect(parse.anime.length).to.be.gt(nonParse.anime && nonParse.anime.length || 0);
-          expect(parse.manga.length).to.be.gte(nonParse.manga && nonParse.manga.length || 0);
+          expect(parse.manga).to.not.exist;
           done();
         })
     })
@@ -149,10 +149,15 @@ describe('Testing the ANN Parse SearchPage client', function () {
       this.timeout(10 * 60 * 60 * 1000);
 
       let titles = [
-        'Cardcaptor Sakura Clear Card Hen',
-        'Boogiepop wa Warawanai (2019)',
-        'Gegege no Kitarou (2018)',
-        'Uchi no Maid ga Uzasugiru!'
+        '【孤独のグルメ 】 大晦日sp 京都・名古屋出張',
+        'saiki kusuo no ψ-nan kanketsu-hen',
+        'goblin slayer',
+        'lord el-melloi ii-sei no jikenbo special',
+        'release the spyce',
+        'akanesasu shoujo end',
+        'kitsune no koe end',
+        'karakuri circus vostfr',
+        'ulysses jehanne darc to renkin no kishi end'
       ];
 
       const ops2 = {apiBackOff: 10};

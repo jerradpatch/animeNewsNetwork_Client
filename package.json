@@ -1,6 +1,6 @@
 {
   "name": "ann_client",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "a javascript client for anime news network",
   "main": "index.js",
   "scripts": {

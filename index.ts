@@ -50,6 +50,8 @@ export class ANN_Client {
     function request(uri) {
       return this.limiter.schedule(() => {
 
+
+
         //when the actual call is made
         if(this.ops.debug) {
           let cTime = new Date();
@@ -71,14 +73,14 @@ export class ANN_Client {
   }
 
   parse(xmlPage) {
-    let ann = convert.xml2js(xmlPage,
+    let ret = convert.xml2js(xmlPage,
       {compact: true, alwaysArray: true, trim: true, nativeType: true}) as any;
-    return ann;
+    return ret.ann && ret.ann[0] || {};
   }
 
   private parseSearchPageTitles(titles: string[]): Promise<{anime: any[], manga: any[]}> {
     return Promise.all(titles.map(title=>this.parseSearchPage(title)))
-      .then((titleResults)=>{
+      .then((titleResults)=>{7
         return titleResults.reduce((acc, {anime, manga})=>{
           acc['anime'] = (acc['anime'] || []).concat(anime);
           acc['manga'] = (acc['manga'] || []).concat(manga);
@@ -109,15 +111,15 @@ export class ANN_Client {
           .map(url=>thiss.request(url)
             .then(page=>{
               let aniPageModel = new EncyclopediaAnime(page);
-              if(aniPageModel.d_episodesLink)
-                return thiss.request(aniPageModel.d_episodesLink)
-                  .then(page=>{
-                    let epsList = new EncyclopediaAnimeEpisodes(page);
-                    delete aniPageModel.d_episodesLink;
-                    aniPageModel['d_episodes'] = epsList.d_episodes;
-                    return aniPageModel;
-                  });
-              else
+              // if(aniPageModel.d_episodesLink)
+              //   return thiss.request(aniPageModel.d_episodesLink)
+              //     .then(page=>{
+              //       let epsList = new EncyclopediaAnimeEpisodes(page);
+              //       delete aniPageModel.d_episodesLink;
+              //       aniPageModel['d_episodes'] = epsList.d_episodes;
+              //       return aniPageModel;
+              //     });
+              // else
                 return aniPageModel;
             })))
     }
@@ -131,28 +133,32 @@ export class ANN_Client {
     let url = this.detailsUrl + 'title=' + id;
     let ret = this.request(url).then(this.parse.bind(this));
     if (this.ops.useDerivedValues)
-      return ret.then((ann) => this.addDerivedValues(ann.ann && ann.ann[0]));
+      return ret.then(this.addDerivedValues.bind(this));
     return ret;
   }
 
   public findTitlesLike(titles: string[]): Promise<IAniManga> {
-    let url = this.detailsUrl + 'title=~' + titles.join('&title=~');
-    let ret = this.request(url).then(this.parse.bind(this));
-    if (this.ops.useDerivedValues) {
-      let derivedProm = ret.then((ann) => this.addDerivedValues(ann.ann && ann.ann[0]));
 
-      if(this.ops.parseSearchPage)
-        return Promise.all([
-          derivedProm,
-          this.parseSearchPageTitles(titles)])
-          .then(([resultApi, resultParse]: [IAniManga, IAniManga]): IAniManga => {
-            let anime = [].concat(resultApi.anime || [], resultParse.anime || []);
-            let manga = [].concat(resultApi.manga || [], resultParse.manga || []);
-            return {anime, manga}
-          });
-      return derivedProm;
+    if (this.ops.useDerivedValues && !this.ops.parseSearchPage) {
+      let url = this.detailsUrl + 'title=~' + titles.join('&title=~');
+      return this.request(url)
+        .then(this.parse.bind(this))
+        .then(this.addDerivedValues.bind(this));
+
+    } else if (this.ops.useDerivedValues && this.ops.parseSearchPage) {
+      return this.parseSearchPageTitles(titles).then(resultParse => {
+        let mainTitles = ([].concat(resultParse.anime, resultParse.manga)).map(rp => rp.d_mainTitle);
+        let dedupMt: string[] = Array.from((new Set(mainTitles)));
+        let url = this.detailsUrl + 'title=~' + dedupMt.join('&title=~');
+        return this.request(url)
+          .then(this.parse.bind(this))
+          .then(this.addDerivedValues.bind(this));
+      })
+
+    } else {
+      let url = this.detailsUrl + 'title=~' + titles.join('&title=~');
+      return this.request(url).then(this.parse.bind(this));
     }
-    return ret;
   }
 
   private addDerivedValues(ann): Promise<any> {

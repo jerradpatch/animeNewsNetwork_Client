@@ -48,13 +48,14 @@ var ANN_Client = /** @class */ (function () {
         }
     };
     ANN_Client.prototype.parse = function (xmlPage) {
-        var ann = convert.xml2js(xmlPage, { compact: true, alwaysArray: true, trim: true, nativeType: true });
-        return ann;
+        var ret = convert.xml2js(xmlPage, { compact: true, alwaysArray: true, trim: true, nativeType: true });
+        return ret.ann && ret.ann[0] || {};
     };
     ANN_Client.prototype.parseSearchPageTitles = function (titles) {
         var _this = this;
         return Promise.all(titles.map(function (title) { return _this.parseSearchPage(title); }))
             .then(function (titleResults) {
+            7;
             return titleResults.reduce(function (acc, _a) {
                 var anime = _a.anime, manga = _a.manga;
                 acc['anime'] = (acc['anime'] || []).concat(anime);
@@ -84,49 +85,50 @@ var ANN_Client = /** @class */ (function () {
                 .map(function (url) { return thiss.request(url)
                 .then(function (page) {
                 var aniPageModel = new EncyclopediaSearchName_1.EncyclopediaAnime(page);
-                if (aniPageModel.d_episodesLink)
-                    return thiss.request(aniPageModel.d_episodesLink)
-                        .then(function (page) {
-                        var epsList = new EncyclopediaSearchName_1.EncyclopediaAnimeEpisodes(page);
-                        delete aniPageModel.d_episodesLink;
-                        aniPageModel['d_episodes'] = epsList.d_episodes;
-                        return aniPageModel;
-                    });
-                else
-                    return aniPageModel;
+                // if(aniPageModel.d_episodesLink)
+                //   return thiss.request(aniPageModel.d_episodesLink)
+                //     .then(page=>{
+                //       let epsList = new EncyclopediaAnimeEpisodes(page);
+                //       delete aniPageModel.d_episodesLink;
+                //       aniPageModel['d_episodes'] = epsList.d_episodes;
+                //       return aniPageModel;
+                //     });
+                // else
+                return aniPageModel;
             }); }));
         }
     };
     ANN_Client.prototype.findTitleWithId = function (id) {
-        var _this = this;
         if (!id)
             return Promise.resolve({});
         var url = this.detailsUrl + 'title=' + id;
         var ret = this.request(url).then(this.parse.bind(this));
         if (this.ops.useDerivedValues)
-            return ret.then(function (ann) { return _this.addDerivedValues(ann.ann && ann.ann[0]); });
+            return ret.then(this.addDerivedValues.bind(this));
         return ret;
     };
     ANN_Client.prototype.findTitlesLike = function (titles) {
         var _this = this;
-        var url = this.detailsUrl + 'title=~' + titles.join('&title=~');
-        var ret = this.request(url).then(this.parse.bind(this));
-        if (this.ops.useDerivedValues) {
-            var derivedProm = ret.then(function (ann) { return _this.addDerivedValues(ann.ann && ann.ann[0]); });
-            if (this.ops.parseSearchPage)
-                return Promise.all([
-                    derivedProm,
-                    this.parseSearchPageTitles(titles)
-                ])
-                    .then(function (_a) {
-                    var resultApi = _a[0], resultParse = _a[1];
-                    var anime = [].concat(resultApi.anime || [], resultParse.anime || []);
-                    var manga = [].concat(resultApi.manga || [], resultParse.manga || []);
-                    return { anime: anime, manga: manga };
-                });
-            return derivedProm;
+        if (this.ops.useDerivedValues && !this.ops.parseSearchPage) {
+            var url = this.detailsUrl + 'title=~' + titles.join('&title=~');
+            return this.request(url)
+                .then(this.parse.bind(this))
+                .then(this.addDerivedValues.bind(this));
         }
-        return ret;
+        else if (this.ops.useDerivedValues && this.ops.parseSearchPage) {
+            return this.parseSearchPageTitles(titles).then(function (resultParse) {
+                var mainTitles = ([].concat(resultParse.anime, resultParse.manga)).map(function (rp) { return rp.d_mainTitle; });
+                var dedupMt = Array.from((new Set(mainTitles)));
+                var url = _this.detailsUrl + 'title=~' + dedupMt.join('&title=~');
+                return _this.request(url)
+                    .then(_this.parse.bind(_this))
+                    .then(_this.addDerivedValues.bind(_this));
+            });
+        }
+        else {
+            var url = this.detailsUrl + 'title=~' + titles.join('&title=~');
+            return this.request(url).then(this.parse.bind(this));
+        }
     };
     ANN_Client.prototype.addDerivedValues = function (ann) {
         var _this = this;
