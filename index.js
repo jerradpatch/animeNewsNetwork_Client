@@ -7,37 +7,94 @@ var internal_compatibility_1 = require("rxjs/internal-compatibility");
 var operators_1 = require("rxjs/operators");
 var rxjs_1 = require("rxjs");
 var random_useragent = require("random-useragent");
+var EncyclopediaSearchName_1 = require("./pageObjects/EncyclopediaSearchName");
 var ANN_Client = /** @class */ (function () {
     function ANN_Client(ops) {
         this.ops = ops;
         this.reportsUrl = 'https://www.animenewsnetwork.com/encyclopedia/reports.xml?';
         this.detailsUrl = 'https://cdn.animenewsnetwork.com/encyclopedia/nodelay.api.xml?';
-        Object.assign(this.ops, { apiBackOff: 10, useDerivedValues: true }, ops);
+        this.clientId = Math.floor((Math.random() * 10000));
+        //needed since searches on this url return more data for anime
+        this.encyclopediaSearchAnimeUrl = "https://www.animenewsnetwork.com/encyclopedia/search/name?only=anime&q=";
+        this.ops = Object.assign({}, { apiBackOff: 10, useDerivedValues: true }, ops);
         this.limiter = new bottleneck_1.default({
             maxConcurrent: 1,
             minTime: ops.apiBackOff * 1000
         });
     }
-    ANN_Client.prototype.requestApi = function (url) {
+    ANN_Client.prototype.request = function (url) {
         var _this = this;
         return rxjs_1.defer(function () { return internal_compatibility_1.fromPromise((_this.ops.requestFn && _this.ops.requestFn(url)) || request.call(_this, url)); }).pipe(operators_1.retry(5))
-            .toPromise()
-            .then(parse.bind(this));
+            .toPromise();
         function request(uri) {
-            //api generates infinite redirect loops when the user agent is not defined ??
-            var userAStr = random_useragent.getRandom();
-            return this.limiter.schedule(function () { return reqProm({
-                maxRedirects: '10',
-                followRedirect: true,
-                headers: {
-                    'user-agent': userAStr
-                },
-                uri: encodeURI(uri)
-            }); });
+            var _this = this;
+            return this.limiter.schedule(function () {
+                //when the actual call is made
+                if (_this.ops.debug) {
+                    var cTime = new Date();
+                    console.log('ann_client', 'request', 'id:', _this.clientId, 'Date:', cTime, 'Elapsed Sec:', Math.floor(Date.now() / 1000), 'url:', url);
+                }
+                //api generates infinite redirect loops when the user agent is not defined ??
+                var userAStr = random_useragent.getRandom();
+                return reqProm({
+                    maxRedirects: '10',
+                    followRedirect: true,
+                    headers: {
+                        'user-agent': userAStr
+                    },
+                    uri: encodeURI(uri)
+                });
+            });
         }
-        function parse(xmlPage) {
-            var ann = convert.xml2js(xmlPage, { compact: true, alwaysArray: true, trim: true, nativeType: true });
-            return ann;
+    };
+    ANN_Client.prototype.parse = function (xmlPage) {
+        var ann = convert.xml2js(xmlPage, { compact: true, alwaysArray: true, trim: true, nativeType: true });
+        return ann;
+    };
+    ANN_Client.prototype.parseSearchPageTitles = function (titles) {
+        var _this = this;
+        return Promise.all(titles.map(function (title) { return _this.parseSearchPage(title); }))
+            .then(function (titleResults) {
+            return titleResults.reduce(function (acc, _a) {
+                var anime = _a.anime, manga = _a.manga;
+                acc['anime'] = (acc['anime'] || []).concat(anime);
+                acc['manga'] = (acc['manga'] || []).concat(manga);
+                return acc;
+            });
+        });
+    };
+    ANN_Client.prototype.parseSearchPage = function (title) {
+        var _this = this;
+        var url = this.encyclopediaSearchAnimeUrl;
+        return this.request(url + title)
+            .then(function (searchPage) {
+            var encPageModel = new EncyclopediaSearchName_1.EncyclopediaSearchName(searchPage);
+            var anime = requestUrls.call(_this, encPageModel.anime);
+            var manga = requestUrls.call(_this, encPageModel.manga);
+            return Promise.all([anime, manga]);
+        }).then(function (_a) {
+            var anime = _a[0], manga = _a[1];
+            return { anime: anime, manga: manga };
+        });
+        function requestUrls(urls) {
+            var thiss = this;
+            return Promise.all(urls
+                .map(function (mod) { return mod.ref; })
+                .filter(function (url) { return !!url; })
+                .map(function (url) { return thiss.request(url)
+                .then(function (page) {
+                var aniPageModel = new EncyclopediaSearchName_1.EncyclopediaAnime(page);
+                if (aniPageModel.d_episodesLink)
+                    return thiss.request(aniPageModel.d_episodesLink)
+                        .then(function (page) {
+                        var epsList = new EncyclopediaSearchName_1.EncyclopediaAnimeEpisodes(page);
+                        delete aniPageModel.d_episodesLink;
+                        aniPageModel['d_episodes'] = epsList.d_episodes;
+                        return aniPageModel;
+                    });
+                else
+                    return aniPageModel;
+            }); }));
         }
     };
     ANN_Client.prototype.findTitleWithId = function (id) {
@@ -45,7 +102,7 @@ var ANN_Client = /** @class */ (function () {
         if (!id)
             return Promise.resolve({});
         var url = this.detailsUrl + 'title=' + id;
-        var ret = this.requestApi(url);
+        var ret = this.request(url).then(this.parse.bind(this));
         if (this.ops.useDerivedValues)
             return ret.then(function (ann) { return _this.addDerivedValues(ann.ann && ann.ann[0]); });
         return ret;
@@ -53,9 +110,22 @@ var ANN_Client = /** @class */ (function () {
     ANN_Client.prototype.findTitlesLike = function (titles) {
         var _this = this;
         var url = this.detailsUrl + 'title=~' + titles.join('&title=~');
-        var ret = this.requestApi(url);
-        if (this.ops.useDerivedValues)
-            return ret.then(function (ann) { return _this.addDerivedValues(ann.ann && ann.ann[0]); });
+        var ret = this.request(url).then(this.parse.bind(this));
+        if (this.ops.useDerivedValues) {
+            var derivedProm = ret.then(function (ann) { return _this.addDerivedValues(ann.ann && ann.ann[0]); });
+            if (this.ops.parseSearchPage)
+                return Promise.all([
+                    derivedProm,
+                    this.parseSearchPageTitles(titles)
+                ])
+                    .then(function (_a) {
+                    var resultApi = _a[0], resultParse = _a[1];
+                    var anime = [].concat(resultApi.anime || [], resultParse.anime || []);
+                    var manga = [].concat(resultApi.manga || [], resultParse.manga || []);
+                    return { anime: anime, manga: manga };
+                });
+            return derivedProm;
+        }
         return ret;
     };
     ANN_Client.prototype.addDerivedValues = function (ann) {
@@ -110,4 +180,5 @@ var ANN_Client = /** @class */ (function () {
     return ANN_Client;
 }());
 exports.ANN_Client = ANN_Client;
+;
 //# sourceMappingURL=index.js.map

@@ -24,7 +24,7 @@ describe('Testing the ANN API client', function () {
         .then(([good, bears]) => {
           const end = Date.now();
 
-          if (bears.ann && good.anime[0].d_mainTitle === bears.anime[0].d_mainTitle)
+          if (good.anime[0].d_mainTitle === bears.anime[0].d_mainTitle)
             throw "results were the same";
 
           if (end - start < (10 * 1000))

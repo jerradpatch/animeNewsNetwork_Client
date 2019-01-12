@@ -5,22 +5,32 @@ import {fromPromise} from "rxjs/internal-compatibility";
 import {retry} from "rxjs/operators";
 import {defer} from "rxjs";
 import * as random_useragent from 'random-useragent';
+import {
+  EncyclopediaAnime,
+  EncyclopediaAnimeEpisodes,
+  EncyclopediaSearchName
+} from "./pageObjects/EncyclopediaSearchName";
 
 export class ANN_Client {
 
   private reportsUrl = 'https://www.animenewsnetwork.com/encyclopedia/reports.xml?';
   private detailsUrl = 'https://cdn.animenewsnetwork.com/encyclopedia/nodelay.api.xml?';
+  private clientId = Math.floor((Math.random() * 10000))
+  //needed since searches on this url return more data for anime
+  private encyclopediaSearchAnimeUrl = "https://www.animenewsnetwork.com/encyclopedia/search/name?only=anime&q=";
 
   private limiter;
 
   constructor(private ops: {
     apiBackOff?: number,
     useDerivedValues?: boolean,
-    requestFn?: (url: string)=>Promise<string>
+    requestFn?: (url: string)=>Promise<string>,
+    parseSearchPage?: boolean,
+    debug?: boolean
   }) {
 
-    Object.assign(
-      this.ops,
+    this.ops = Object.assign(
+      {},
       {apiBackOff: 10, useDerivedValues: true},
       ops);
     this.limiter = new Bottleneck({
@@ -29,34 +39,89 @@ export class ANN_Client {
     });
   }
 
-
-  private requestApi(url): Promise<any> {
+  private request(url): Promise<any> {
 
     return defer(() => fromPromise(
       (this.ops.requestFn && this.ops.requestFn(url)) || request.call(this, url)
     )).pipe(
       retry(5))
-      .toPromise()
-      .then(parse.bind(this));
+      .toPromise();
 
     function request(uri) {
-      //api generates infinite redirect loops when the user agent is not defined ??
-      let userAStr = random_useragent.getRandom();
-      return this.limiter.schedule(() => reqProm({
-        maxRedirects: '10',
-        followRedirect: true,
-        headers: {
-          'user-agent': userAStr
-        },
-        uri: encodeURI(uri)
-      }))
+      return this.limiter.schedule(() => {
+
+        //when the actual call is made
+        if(this.ops.debug) {
+          let cTime = new Date();
+          console.log('ann_client', 'request', 'id:', this.clientId, 'Date:', cTime, 'Elapsed Sec:', Math.floor(Date.now() / 1000) , 'url:', url);
+        }
+
+        //api generates infinite redirect loops when the user agent is not defined ??
+        let userAStr = random_useragent.getRandom();
+        return reqProm({
+          maxRedirects: '10',
+          followRedirect: true,
+          headers: {
+            'user-agent': userAStr
+          },
+          uri: encodeURI(uri)
+        })
+      })
+    }
+  }
+
+  parse(xmlPage) {
+    let ann = convert.xml2js(xmlPage,
+      {compact: true, alwaysArray: true, trim: true, nativeType: true}) as any;
+    return ann;
+  }
+
+  private parseSearchPageTitles(titles: string[]): Promise<{anime: any[], manga: any[]}> {
+    return Promise.all(titles.map(title=>this.parseSearchPage(title)))
+      .then((titleResults)=>{
+        return titleResults.reduce((acc, {anime, manga})=>{
+          acc['anime'] = (acc['anime'] || []).concat(anime);
+          acc['manga'] = (acc['manga'] || []).concat(manga);
+          return acc;
+        });
+      });
+  }
+
+  private parseSearchPage(title: string): Promise<IAniManga> {
+    let url = this.encyclopediaSearchAnimeUrl;
+    return this.request(url+title)
+      .then(searchPage=>{
+        let encPageModel = new EncyclopediaSearchName(searchPage);
+        let anime = requestUrls.call(this, encPageModel.anime);
+        let manga = requestUrls.call(this, encPageModel.manga);
+        return Promise.all([anime, manga]);
+      }).then(([anime, manga])=>{
+        return {anime, manga};
+      });
+
+
+    function requestUrls(urls: any): Promise<any[]> {
+      let thiss = this;
+      return Promise.all(
+        urls
+          .map((mod)=>mod.ref)
+          .filter(url=>!!url)
+          .map(url=>thiss.request(url)
+            .then(page=>{
+              let aniPageModel = new EncyclopediaAnime(page);
+              if(aniPageModel.d_episodesLink)
+                return thiss.request(aniPageModel.d_episodesLink)
+                  .then(page=>{
+                    let epsList = new EncyclopediaAnimeEpisodes(page);
+                    delete aniPageModel.d_episodesLink;
+                    aniPageModel['d_episodes'] = epsList.d_episodes;
+                    return aniPageModel;
+                  });
+              else
+                return aniPageModel;
+            })))
     }
 
-    function parse(xmlPage) {
-      let ann = convert.xml2js(xmlPage,
-        {compact: true, alwaysArray: true, trim: true, nativeType: true}) as any;
-      return ann;
-    }
   }
 
   public findTitleWithId(id: string): Promise<any> {
@@ -64,17 +129,29 @@ export class ANN_Client {
       return Promise.resolve({});
 
     let url = this.detailsUrl + 'title=' + id;
-    let ret = this.requestApi(url);
+    let ret = this.request(url).then(this.parse.bind(this));
     if (this.ops.useDerivedValues)
       return ret.then((ann) => this.addDerivedValues(ann.ann && ann.ann[0]));
     return ret;
   }
 
-  public findTitlesLike(titles: string[]): Promise<any> {
+  public findTitlesLike(titles: string[]): Promise<IAniManga> {
     let url = this.detailsUrl + 'title=~' + titles.join('&title=~');
-    let ret = this.requestApi(url);
-    if (this.ops.useDerivedValues)
-      return ret.then((ann) => this.addDerivedValues(ann.ann && ann.ann[0]));
+    let ret = this.request(url).then(this.parse.bind(this));
+    if (this.ops.useDerivedValues) {
+      let derivedProm = ret.then((ann) => this.addDerivedValues(ann.ann && ann.ann[0]));
+
+      if(this.ops.parseSearchPage)
+        return Promise.all([
+          derivedProm,
+          this.parseSearchPageTitles(titles)])
+          .then(([resultApi, resultParse]: [IAniManga, IAniManga]): IAniManga => {
+            let anime = [].concat(resultApi.anime || [], resultParse.anime || []);
+            let manga = [].concat(resultApi.manga || [], resultParse.manga || []);
+            return {anime, manga}
+          });
+      return derivedProm;
+    }
     return ret;
   }
 
@@ -126,3 +203,5 @@ export class ANN_Client {
       return sing[0]._attributes[retKey] || sing[0]['_text'][0];
   }
 }
+
+interface IAniManga {anime: any[], manga: any[]};
