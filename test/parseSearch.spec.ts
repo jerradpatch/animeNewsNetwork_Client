@@ -226,6 +226,7 @@ describe('Testing the ANN Parse SearchPage client', function () {
 
   function testAnimePage(spMod){
     expect(spMod.d_mainTitle).to.eq('Jinki:Extend');
+    expect(spMod.d_type).to.eq('TV');
 
     expect(spMod.d_genre).to.have.lengthOf(2);
     expect(spMod.d_genre).to.eql(['drama', 'science fiction']);
@@ -240,6 +241,7 @@ describe('Testing the ANN Parse SearchPage client', function () {
 
   function testMangaPage(spMod){
     expect('Jinki').to.eq(spMod.d_mainTitle);
+    expect('manga').to.eq(spMod.d_type);
 
     expect(spMod.d_genre).to.have.lengthOf(1);
     expect(['science fiction']).to.eql(spMod.d_genre);

@@ -26,6 +26,7 @@ export class EncyclopediaSearchName {
 export class EncyclopediaAnime {
 
   d_mainTitle;
+  d_type;
   d_genre = [];
   d_altTitles = [];
   d_plotSummary;
@@ -37,6 +38,8 @@ export class EncyclopediaAnime {
 
     this.d_mainTitle = ($('#page-title > #page_header').text() || "")
       .replace(/\([a-zA-Z]*\)/, "").trim();
+
+    this.d_type = ((($('#page-title > #page_header').text() || "").match(/\(.*\)/) || [""])[0].match(/[a-zA-Z]+/) || [])[0];
 
     this.d_genre = $('#infotype-30 > span > a').map(function(i, el) {
       return $(this).text();
