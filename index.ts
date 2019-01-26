@@ -73,7 +73,7 @@ export class ANN_Client {
   }
 
   parse(xmlPage) {
-    let ret = convert.xml2js(xmlPage,
+    let ret = convert.xml2js(xmlPage || "",
       {compact: true, alwaysArray: true, trim: true, nativeType: true}) as any;
     return ret.ann && ret.ann[0] || {};
   }
