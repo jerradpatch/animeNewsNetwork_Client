@@ -48,7 +48,7 @@ var ANN_Client = /** @class */ (function () {
         }
     };
     ANN_Client.prototype.parse = function (xmlPage) {
-        var ret = convert.xml2js(xmlPage, { compact: true, alwaysArray: true, trim: true, nativeType: true });
+        var ret = convert.xml2js(xmlPage || "", { compact: true, alwaysArray: true, trim: true, nativeType: true });
         return ret.ann && ret.ann[0] || {};
     };
     ANN_Client.prototype.parseSearchPageTitles = function (titles) {
