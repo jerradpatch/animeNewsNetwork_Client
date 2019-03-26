@@ -122,6 +122,15 @@ describe('Testing the ANN Parse SearchPage client', function () {
       })
     })
 
+    it('it should return matching anime for title', function (done) {
+      const titles = ['바질리스크 코우가인법첩'];
+      ann.findTitlesLike(titles).then((parse: {anime: any[], manga: any[]})=>{
+        expect(parse.anime.length).to.be.equal(2);
+        expect(parse.manga.length).to.be.equal(1);
+        done();
+      })
+    })
+
     it('it should return more results than a regular search', function (done) {
       const ops2 = {apiBackOff: 10};
       const ann2 = new ANN_Client(ops2);
