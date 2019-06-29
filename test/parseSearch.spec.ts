@@ -20,7 +20,7 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 const baseUrl = "https://www.animenewsnetwork.com";
 
 describe('Testing the ANN Parse SearchPage client', function () {
-  this.timeout(15000);
+  this.timeout(5 * 60 * 1000);
 
   describe('Test encyclopedia Page Objects parse correct information', function () {
     it('test encyclopedia/search/name?only=anime&q=jinki saved page is parsed correctly', function (done) {
@@ -83,6 +83,9 @@ describe('Testing the ANN Parse SearchPage client', function () {
           testEpisodesPage(spMod);
           done();
         })
+        .catch(e=>{
+          done(e);
+        })
     })
   });
 
@@ -101,8 +104,21 @@ describe('Testing the ANN Parse SearchPage client', function () {
         expect(parse.anime.length).to.be.equal(1);
         expect(parse.manga.length).to.be.equal(0);
         done();
+      }).catch(e=>{
+        done(new Error(e));
       })
-    })
+    });
+
+    it('it should have parsed search result for single title Zoids', function (done) {
+      const titleZ = 'Zoids Wild Raw';
+      ann['parseSearchPage'](titleZ).then((parse: {anime: any[], manga: any[]})=>{
+        expect(parse.anime.length).to.be.gte(1);
+        expect(parse.manga.length).to.be.equal(0);
+        done();
+      }).catch(e=>{
+        done(new Error(e));
+      })
+    });
 
     it('it should have parsed search results for multi titles', function (done) {
       const titles = ['ulysses jehanne darc to renkin no kishi'];
@@ -111,14 +127,19 @@ describe('Testing the ANN Parse SearchPage client', function () {
         expect(parse.manga.length).to.be.equal(0);
         done();
       })
+      .catch(e=>{
+        done(new Error(e));
+      })
     })
 
     it('it should have parse search results matching nonParse search results', function (done) {
       const titles = ['ulysses jehanne darc to renkin no kishi'];
       ann.findTitlesLike(titles).then((parse: {anime: any[], manga: any[]})=>{
         expect(parse.anime.length).to.be.equal(1);
-        expect(parse.manga).to.not.exist;
+        expect(parse.manga.length).to.be.equal(0);
         done();
+      }).catch(e=>{
+        done(new Error(e));
       })
     })
 
@@ -128,6 +149,9 @@ describe('Testing the ANN Parse SearchPage client', function () {
         expect(parse.anime.length).to.be.equal(2);
         expect(parse.manga.length).to.be.equal(1);
         done();
+      })
+      .catch(e=>{
+        done(new Error(e));
       })
     })
 
@@ -139,8 +163,11 @@ describe('Testing the ANN Parse SearchPage client', function () {
         ann2.findTitlesLike(titles),
         ann.findTitlesLike(titles)]).then(([nonParse, parse]: {anime: any[], manga: any[]}[])=>{
           expect(parse.anime.length).to.be.gt(nonParse.anime && nonParse.anime.length || 0);
-          expect(parse.manga).to.not.exist;
+          expect(parse.manga.length).to.be.equal(0);
           done();
+        })
+        .catch(e=>{
+          done(new Error(e));
         })
     })
   })
@@ -166,7 +193,8 @@ describe('Testing the ANN Parse SearchPage client', function () {
         'akanesasu shoujo end',
         'kitsune no koe end',
         'karakuri circus vostfr',
-        'ulysses jehanne darc to renkin no kishi end'
+        'ulysses jehanne darc to renkin no kishi end',
+        'zoids wild raw'
       ];
 
       const ops2 = {apiBackOff: 10};

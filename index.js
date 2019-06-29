@@ -55,7 +55,6 @@ var ANN_Client = /** @class */ (function () {
         var _this = this;
         return Promise.all(titles.map(function (title) { return _this.parseSearchPage(title); }))
             .then(function (titleResults) {
-            7;
             return titleResults.reduce(function (acc, _a) {
                 var anime = _a.anime, manga = _a.manga;
                 acc['anime'] = (acc['anime'] || []).concat(anime);
@@ -110,24 +109,35 @@ var ANN_Client = /** @class */ (function () {
     ANN_Client.prototype.findTitlesLike = function (titles) {
         var _this = this;
         if (this.ops.useDerivedValues && !this.ops.parseSearchPage) {
-            var url = this.detailsUrl + 'title=~' + titles.join('&title=~');
-            return this.request(url)
-                .then(this.parse.bind(this))
-                .then(this.addDerivedValues.bind(this));
+            return deriveddedupMt.call(this, titles);
         }
         else if (this.ops.useDerivedValues && this.ops.parseSearchPage) {
             return this.parseSearchPageTitles(titles).then(function (resultParse) {
                 var mainTitles = ([].concat(resultParse.anime, resultParse.manga)).map(function (rp) { return rp.d_mainTitle; });
                 var dedupMt = Array.from((new Set(mainTitles)));
-                var url = _this.detailsUrl + 'title=~' + dedupMt.join('&title=~');
-                return _this.request(url)
-                    .then(_this.parse.bind(_this))
-                    .then(_this.addDerivedValues.bind(_this));
+                return deriveddedupMt.call(_this, dedupMt);
             });
         }
         else {
-            var url = this.detailsUrl + 'title=~' + titles.join('&title=~');
-            return this.request(url).then(this.parse.bind(this));
+            return reqParse.call(this, titles);
+        }
+        function deriveddedupMt(dedupMt) {
+            return reqParse.call(this, dedupMt)
+                .then(this.addDerivedValues.bind(this));
+        }
+        function reqParse(dedupMt) {
+            var _this = this;
+            return Promise.all(dedupMt.map(function (dep) {
+                return _this.request(_this.detailsUrl + 'title=~' + dep);
+            }))
+                .then(function (resps) { return resps.map(_this.parse.bind(_this)); })
+                .then(function (annResps) {
+                return annResps.reduce(function (acc, c) {
+                    acc.anime = [].concat(acc.anime, c.anime || []);
+                    acc.manga = [].concat(acc.manga, c.manga || []);
+                    return acc;
+                }, { anime: [], manga: [] });
+            });
         }
     };
     ANN_Client.prototype.addDerivedValues = function (ann) {

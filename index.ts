@@ -72,7 +72,7 @@ export class ANN_Client {
     }
   }
 
-  parse(xmlPage) {
+  parse(xmlPage): IAniManga {
     let ret = convert.xml2js(xmlPage || "",
       {compact: true, alwaysArray: true, trim: true, nativeType: true}) as any;
     return ret.ann && ret.ann[0] || {};
@@ -80,7 +80,7 @@ export class ANN_Client {
 
   private parseSearchPageTitles(titles: string[]): Promise<{anime: any[], manga: any[]}> {
     return Promise.all(titles.map(title=>this.parseSearchPage(title)))
-      .then((titleResults)=>{7
+      .then((titleResults)=>{
         return titleResults.reduce((acc, {anime, manga})=>{
           acc['anime'] = (acc['anime'] || []).concat(anime);
           acc['manga'] = (acc['manga'] || []).concat(manga);
@@ -140,28 +140,39 @@ export class ANN_Client {
   public findTitlesLike(titles: string[]): Promise<IAniManga> {
 
     if (this.ops.useDerivedValues && !this.ops.parseSearchPage) {
-      let url = this.detailsUrl + 'title=~' + titles.join('&title=~');
-      return this.request(url)
-        .then(this.parse.bind(this))
-        .then(this.addDerivedValues.bind(this));
+      return deriveddedupMt.call(this, titles);
 
     } else if (this.ops.useDerivedValues && this.ops.parseSearchPage) {
       return this.parseSearchPageTitles(titles).then(resultParse => {
         let mainTitles = ([].concat(resultParse.anime, resultParse.manga)).map(rp => rp.d_mainTitle);
         let dedupMt: string[] = Array.from((new Set(mainTitles)));
-        let url = this.detailsUrl + 'title=~' + dedupMt.join('&title=~');
-        return this.request(url)
-          .then(this.parse.bind(this))
-          .then(this.addDerivedValues.bind(this));
+        return deriveddedupMt.call(this, dedupMt);
       })
 
     } else {
-      let url = this.detailsUrl + 'title=~' + titles.join('&title=~');
-      return this.request(url).then(this.parse.bind(this));
+      return reqParse.call(this, titles);
     }
+
+    function deriveddedupMt(dedupMt: string[]): Promise<IAniManga> {
+      return reqParse.call(this, dedupMt)
+          .then(this.addDerivedValues.bind(this));
+    }
+    function reqParse(dedupMt: string[]): Promise<IAniManga> {
+      return Promise.all(dedupMt.map(dep=>
+          this.request(this.detailsUrl + 'title=~' + dep)))
+          .then(resps=>resps.map(this.parse.bind(this)))
+          .then((annResps : IAniManga[]): IAniManga => {
+            return annResps.reduce((acc: IAniManga, c: IAniManga) => {
+              acc.anime = [].concat(acc.anime, c.anime || []);
+              acc.manga = [].concat(acc.manga, c.manga || []);
+              return acc;
+            }, {anime: [], manga: []});
+          });
+    }
+
   }
 
-  private addDerivedValues(ann): Promise<any> {
+  private addDerivedValues(ann): Promise<IAniManga> {
     if (ann.anime) {
       ann.anime.forEach(an => {
         if (an.info) {

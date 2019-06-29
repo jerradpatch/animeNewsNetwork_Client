@@ -13,7 +13,7 @@ export declare class ANN_Client {
         debug?: boolean;
     });
     private request;
-    parse(xmlPage: any): any;
+    parse(xmlPage: any): IAniManga;
     private parseSearchPageTitles;
     private parseSearchPage;
     findTitleWithId(id: string): Promise<any>;
