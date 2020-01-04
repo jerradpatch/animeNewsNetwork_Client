@@ -1,9 +1,6 @@
 import * as convert from 'xml-js';
 import Bottleneck from "bottleneck"
 import * as reqProm from 'request-promise';
-import {fromPromise} from "rxjs/internal-compatibility";
-import {retry} from "rxjs/operators";
-import {defer} from "rxjs";
 import * as random_useragent from 'random-useragent';
 import {
   EncyclopediaAnime,
@@ -41,16 +38,18 @@ export class ANN_Client {
 
   private request(url): Promise<any> {
 
-    return defer(() => fromPromise(
-      (this.ops.requestFn && this.ops.requestFn(url)) || request.call(this, url)
-    )).pipe(
-      retry(5))
-      .toPromise();
+    let retry = 0;
+    return (this.ops.requestFn && this.ops.requestFn(url)) || request.call(this, url)
+      .catch(e=>{
+        retry++;
+
+        if(retry < 5)
+          return request.call(this, url);
+        throw e;
+      })
 
     function request(uri) {
       return this.limiter.schedule(() => {
-
-
 
         //when the actual call is made
         if(this.ops.debug) {
@@ -105,22 +104,11 @@ export class ANN_Client {
     function requestUrls(urls: any): Promise<any[]> {
       let thiss = this;
       return Promise.all(
-        urls
-          .map((mod)=>mod.ref)
+        urls.map((mod)=>mod.ref)
           .filter(url=>!!url)
           .map(url=>thiss.request(url)
             .then(page=>{
-              let aniPageModel = new EncyclopediaAnime(page);
-              // if(aniPageModel.d_episodesLink)
-              //   return thiss.request(aniPageModel.d_episodesLink)
-              //     .then(page=>{
-              //       let epsList = new EncyclopediaAnimeEpisodes(page);
-              //       delete aniPageModel.d_episodesLink;
-              //       aniPageModel['d_episodes'] = epsList.d_episodes;
-              //       return aniPageModel;
-              //     });
-              // else
-                return aniPageModel;
+              return new EncyclopediaAnime(page);
             })))
     }
 

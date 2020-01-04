@@ -109,7 +109,8 @@ describe('Testing the ANN Parse SearchPage client', function () {
       })
     });
 
-    it('it should have parsed search result for single title Zoids', function (done) {
+    it('it should have parsed search result for single title Zoids, takes 5 min', function (done) {
+      this.timeout(10 * 60 * 1000);
       const titleZ = 'Zoids Wild Raw';
       ann['parseSearchPage'](titleZ).then((parse: {anime: any[], manga: any[]})=>{
         expect(parse.anime.length).to.be.gte(1);
@@ -119,7 +120,16 @@ describe('Testing the ANN Parse SearchPage client', function () {
         done(new Error(e));
       })
     });
-
+    it('it should have parsed search result for single title, arifureta from commonplace to world\'s strongest', function (done) {
+      var titleZ = 'arifureta from commonplace to world\'s strongest';
+      ann.findTitlesLike([titleZ]).then(function (parse) {
+        expect(parse.anime.length).to.be.gte(1);
+        expect(parse.manga.length).to.be.equal(0);
+        done();
+      }).catch(function (e) {
+        done(e);
+      });
+    });
     it('it should have parsed search results for multi titles', function (done) {
       const titles = ['ulysses jehanne darc to renkin no kishi'];
       ann['parseSearchPageTitles'](titles).then((parse: {anime: any[], manga: any[]})=>{
@@ -182,19 +192,12 @@ describe('Testing the ANN Parse SearchPage client', function () {
     const ann = new ANN_Client(ops);
 
     it('It should have a larger number of results per title given a list of titles', function (done) {
-      this.timeout(10 * 60 * 60 * 1000);
+      this.timeout(5 * 60 * 1000);
 
       let titles = [
         '【孤独のグルメ 】 大晦日sp 京都・名古屋出張',
         'saiki kusuo no ψ-nan kanketsu-hen',
-        'goblin slayer',
-        'lord el-melloi ii-sei no jikenbo special',
-        'release the spyce',
-        'akanesasu shoujo end',
-        'kitsune no koe end',
-        'karakuri circus vostfr',
-        'ulysses jehanne darc to renkin no kishi end',
-        'zoids wild raw'
+        'goblin slayer'
       ];
 
       const ops2 = {apiBackOff: 10};
