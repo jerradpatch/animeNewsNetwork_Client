@@ -15,7 +15,7 @@ var ANN_Client = /** @class */ (function () {
         this.encyclopediaSearchAnimeUrl = "https://www.animenewsnetwork.com/encyclopedia/search/name?only=anime&q=";
         this.ops = Object.assign({}, { apiBackOff: 10, useDerivedValues: true }, ops);
         this.limiter = new bottleneck_1.default({
-            maxConcurrent: 1,
+            maxConcurrent: ops.maxConcurrent || 1,
             minTime: ops.apiBackOff * 1000
         });
     }

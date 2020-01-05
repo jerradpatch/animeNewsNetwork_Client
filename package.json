@@ -6,7 +6,7 @@
   "scripts": {
     "clean": "rm ./index.js --force && find ./test -name '*.js*' -exec rm {} \\;",
     "pretest": "npm run clean && tsc -p ./",
-    "test": "./node_modules/.bin/mocha --timeout 0 --ui bdd ./test"
+    "test": "./node_modules/.bin/mocha --timeout 0 --ui bdd --require ts-node/register test/**/*.spec.ts"
   },
   "author": "",
   "license": "ISC",

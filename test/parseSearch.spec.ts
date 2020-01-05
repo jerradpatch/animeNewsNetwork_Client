@@ -1,4 +1,4 @@
-import {ANN_Client} from '../index';
+import {ANN_Client} from '../src';
 import * as chai from 'chai';
 import * as rp from 'request-promise';
 
@@ -6,7 +6,7 @@ import {
   EncyclopediaAnime,
   EncyclopediaAnimeEpisodes,
   EncyclopediaSearchName
-} from "../pageObjects/EncyclopediaSearchName";
+} from "../src/pageObjects/EncyclopediaSearchName";
 import {encyclopediaSearchNamePage} from "./RawPages/EncyclopediaSearchNamePage";
 import {encyclopediaAnimePage} from "./RawPages/EncyclopediaAnimePage";
 import {encyclopediaAnime_episodesPage} from "./RawPages/EncyclopediaAnime_EpisodesPage";

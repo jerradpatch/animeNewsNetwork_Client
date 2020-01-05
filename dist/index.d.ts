@@ -7,6 +7,7 @@ export declare class ANN_Client {
     private limiter;
     constructor(ops: {
         apiBackOff?: number;
+        maxConcurrent?: number;
         useDerivedValues?: boolean;
         requestFn?: (url: string) => Promise<string>;
         parseSearchPage?: boolean;

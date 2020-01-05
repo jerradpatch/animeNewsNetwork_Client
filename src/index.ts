@@ -20,6 +20,7 @@ export class ANN_Client {
 
   constructor(private ops: {
     apiBackOff?: number,
+    maxConcurrent?: number,
     useDerivedValues?: boolean,
     requestFn?: (url: string)=>Promise<string>,
     parseSearchPage?: boolean,
@@ -31,7 +32,7 @@ export class ANN_Client {
       {apiBackOff: 10, useDerivedValues: true},
       ops);
     this.limiter = new Bottleneck({
-      maxConcurrent: 1,
+      maxConcurrent: ops.maxConcurrent || 1,
       minTime: ops.apiBackOff * 1000
     });
   }

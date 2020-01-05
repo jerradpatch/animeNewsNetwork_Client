@@ -1,4 +1,4 @@
-import {ANN_Client} from '../index';
+import {ANN_Client} from '../src';
 import * as chai from 'chai';
 import * as rp from 'request-promise';
 import * as random_useragent from 'random-useragent';
