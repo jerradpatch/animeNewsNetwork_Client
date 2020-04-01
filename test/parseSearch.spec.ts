@@ -1,6 +1,7 @@
 import {ANN_Client} from '../src';
 import * as chai from 'chai';
 import * as rp from 'request-promise';
+import axios from 'axios';
 
 import {
   EncyclopediaAnime,
@@ -18,6 +19,51 @@ const expect = chai.expect;
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 const baseUrl = "https://www.animenewsnetwork.com";
+
+it('it should have parsed search result for single title, One Piece', function (done) {
+  let titleZ = 'One Piece';
+
+  const ops = {
+    apiBackOff: 10,
+    useDerivedValues: true,
+    parseSearchPage: true,
+    requestFn(url){
+      let localFetchOptions = {
+        method: 'GET',
+        url: encodeURI(url),
+        maxRedirects: 5,
+        rejectUnauthorized: false,
+        maxContentLength: 1000 * 1000, //1mb
+        timeout: 20 * 1000,
+        proxy : {
+          host: 'zproxy.lum-superproxy.io',
+          port:22225,
+          auth: {
+            username: 'lum-customer-hl_ba60af82-zone-static',
+            password: 'nade5ihqrfh9'
+          }
+        }
+      } as any;
+      return axios(localFetchOptions)
+      .then(rep=>{
+        throw '';
+      })
+      .catch(e=>{
+        throw '';
+      })
+    }
+  };
+  const ann = new ANN_Client(ops);
+
+
+  ann.findTitlesLike([titleZ]).then(function (parse) {
+    expect(parse.anime.length).to.be.gte(0);
+    expect(parse.manga.length).to.be.gte(0);
+    done();
+  }).catch(function (e) {
+    done(e);
+  });
+});
 
 describe('Testing the ANN Parse SearchPage client', function () {
   this.timeout(5 * 60 * 1000);
